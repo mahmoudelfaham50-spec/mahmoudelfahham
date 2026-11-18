@@ -40,6 +40,44 @@
     if (event.key === 'Escape') closeMenu();
   });
 
+  // Small global motion cues: reading progress, a compact return control, and
+  // a pointer-following ambient glow on fine pointers only.
+  const progress = document.createElement('div');
+  progress.className = 'scroll-progress';
+  progress.setAttribute('aria-hidden', 'true');
+  document.body.append(progress);
+  const backToTop = document.createElement('button');
+  backToTop.className = 'back-to-top';
+  backToTop.type = 'button';
+  backToTop.setAttribute('aria-label', 'Back to top');
+  backToTop.innerHTML = '<span aria-hidden="true">↑</span>';
+  document.body.append(backToTop);
+  backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  let scrollQueued = false;
+  const updateScrollDecor = () => {
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    progress.style.transform = `scaleX(${Math.min(1, window.scrollY / maxScroll)})`;
+    document.body.classList.toggle('has-scrolled', window.scrollY > 28);
+    backToTop.classList.toggle('is-visible', window.scrollY > 650);
+    scrollQueued = false;
+  };
+  window.addEventListener('scroll', () => {
+    if (!scrollQueued) { scrollQueued = true; requestAnimationFrame(updateScrollDecor); }
+  }, { passive: true });
+  updateScrollDecor();
+  if (window.matchMedia('(pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let pointerQueued = false;
+    window.addEventListener('pointermove', event => {
+      if (pointerQueued) return;
+      pointerQueued = true;
+      requestAnimationFrame(() => {
+        root.style.setProperty('--pointer-x', `${event.clientX}px`);
+        root.style.setProperty('--pointer-y', `${event.clientY}px`);
+        pointerQueued = false;
+      });
+    }, { passive: true });
+  }
+
   const navLinks = [...document.querySelectorAll('.nav a[href^="#"]')];
   const observedSections = navLinks.map(link => document.querySelector(link.getAttribute('href'))).filter(Boolean);
   if ('IntersectionObserver' in window) {
@@ -216,7 +254,7 @@
   }));
 
   const form = document.querySelector('#contact-form');
-  form.addEventListener('submit', event => {
+  form?.addEventListener('submit', event => {
     event.preventDefault();
     const feedback = form.querySelector('.form-feedback');
     feedback.textContent = 'Thanks — the form is ready, but message delivery needs a connected backend or email service.';
